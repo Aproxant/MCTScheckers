@@ -69,8 +69,12 @@ class State:
                         self.board[i][j] = Piece(-1)
                     else:
                         self.board[i][j] = Piece(1)
+                    
+                    if game.board.matrix[i][j].occupant.king:
+                        self.board[i][j].king=True
                 else:
                     self.board[i][j] = Piece(0)
+
 
         if game.turn == RED:
             self.current_player = -1
@@ -88,11 +92,11 @@ class State:
                         moves.append(((i, j), x[0], x[1]))
         return moves
 
-    def blind_legal_moves(self, x, y):
-        if self.board[x][y].val != 0:
-            if self.board[x][y].val == 1 and self.board[x][y].king == False:
+    def blind_legal_moves(self, x, y,hit=0):
+        if self.board[x][y].val != 0 or hit==1 or hit==-1:
+            if (self.board[x][y].val == 1 or hit==1) and self.board[x][y].king == False:
                 blind_legal_moves = [(x - 1, y - 1), (x + 1, y - 1)]
-            elif self.board[x][y].val == -1 and self.board[x][y].king == False:
+            elif (self.board[x][y].val == -1 or hit==-1) and self.board[x][y].king == False:
                 blind_legal_moves = [(x - 1, y + 1), (x + 1, y + 1)]
             else:
                 blind_legal_moves = [(x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1), (x + 1, y + 1)]
@@ -122,35 +126,23 @@ class State:
                     self.board[move[0]][move[1]].val != self.board[x][y].val
                     and self.on_board((move[0] + (move[0] - x), move[1] + (move[1] - y)))
                     and self.board[move[0] + (move[0] - x)][move[1] + (move[1] - y)].val == 0
-                ):  # is this location filled by an enemy piece?
+                    ):  # is this location filled by an enemy piece?
+
                     hit = (move[0], move[1])
                     legal_moves = [((move[0] + (move[0] - x), move[1] + (move[1] - y)), [hit])]
                     while next_hop:
-                        next_hop = False
-                        for i in self.blind_legal_moves(legal_moves[-1][0][0], legal_moves[-1][0][1]):
-                            if i[0] == hit[0] and i[1] == hit[1]:
-                                continue
-                            if (
-                                self.board[i[0]][i[1]].val != 0
-                                and self.board[i[0]][i[1]].val
-                                != self.board[legal_moves[-1][0][0]][legal_moves[-1][0][1]].val
-                                and self.on_board(
-                                    (i[0] + (i[0] - legal_moves[-1][0][0]), i[1] + (i[1] - legal_moves[-1][0][1]))
-                                )
-                                and self.board[i[0] + (i[0] - legal_moves[-1][0])][
-                                    i[1] + (i[1] - legal_moves[-1][1])
-                                ].val
-                                == 0
-                            ):
-                                hit = (i[0], i[1])
-                                legal_moves.append(
-                                    (
-                                        (i[0] + (i[0] - legal_moves[-1][0][0])),
-                                        i[1] + (i[1] - legal_moves[-1][0][1]),
-                                        [legal_moves[-1][1], hit],
-                                    )
-                                )
-                                next_hop = True
+                        next_hop = False                                               
+                        for i in self.blind_legal_moves(legal_moves[-1][0][0], legal_moves[-1][0][1],self.board[x][y].val):
+                            if self.on_board(i):  
+                                if i[0] == legal_moves[-1][1][-1][0] and i[1] == legal_moves[-1][1][-1][1]:
+                                    continue
+                                if (self.board[i[0]][i[1]].val != 0 and self.board[i[0]][i[1]].val != self.board[legal_moves[-1][0][0]][legal_moves[-1][0][1]].val and self.on_board((i[0] + (i[0] - legal_moves[-1][0][0]), i[1] + (i[1] - legal_moves[-1][0][1])))
+                                    and self.board[i[0] + (i[0] - legal_moves[-1][0][0])][i[1] + (i[1] - legal_moves[-1][0][1])].val == 0):
+                                    hit = (i[0], i[1])
+                                    prevHit=copy.deepcopy(legal_moves[-1][1])
+                                    prevHit.append(i)
+                                    legal_moves.append(((i[0] + (i[0] - legal_moves[-1][0][0]),i[1] + (i[1] - legal_moves[-1][0][1])),prevHit))
+                                    next_hop = True
 
                     legal_moves = [legal_moves[-1]]
 
@@ -167,8 +159,6 @@ class State:
         x, y = start
         end_x, end_y = end
 
-        # self.printBoard()
-        # print()
         if len(move[2]) == 0:
             self.board[end_x][end_y].val = self.board[x][y].val
             self.board[end_x][end_y].king = self.board[x][y].king
@@ -288,16 +278,18 @@ class MCTS:
     def search(self, state):
         root = Node(state)
 
-        for _ in range(self.simulation_count):
+        for i in range(self.simulation_count):
             node = self.selection(root)
 
             score = self.simulation(copy.deepcopy(node.state))
             self.backpropagate(node, score)
+            #print(i)
 
+        if len(root.children)==0:
+            return 0
         best_child = root.children[0]
         for child in root.children:
-            child.state.printBoard()
-            print()
+
             if child.visits > best_child.visits:
                 best_child = child
 
@@ -346,27 +338,46 @@ class MCTS:
             node.update(score)
             node = node.parent
 
+def alphabeta(state, depth, alpha, beta, maximizing_player):
+    if depth == 0 or state.is_terminal():
+        return state.evaluate()
 
-"""
-possible_moves = state.get_possible_moves()
-            prioritized_moves = sorted(
-                possible_moves, key=lambda move: state.evaluate_move(move), reverse=True
-            )
+    if maximizing_player:
+        max_eval = float("-inf")
+        legal_moves = state.get_legal_moves()
+        for move in legal_moves:
+            child_state = state.clone()
+            child_state.make_move(move)
+            eval = alphabeta(child_state, depth - 1, alpha, beta, False)
+            max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break  # Beta cutoff
+        return max_eval
+    else:
+        min_eval = float("inf")
+        legal_moves = state.get_legal_moves()
+        for move in legal_moves:
+            child_state = state.clone()
+            child_state.make_move(move)
+            eval = alphabeta(child_state, depth - 1, alpha, beta, True)
+            min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break  # Alpha cutoff
+        return min_eval
 
-            max_piece_count = float('-inf')
-            best_move = None
-            for move in prioritized_moves:
-                temp_state = state.copy()
-                temp_state.make_move(move)
-                piece_count = temp_state.get_piece_count(self.current_player)
-                if piece_count > max_piece_count:
-                    max_piece_count = piece_count
-                    best_move = move
+def find_best_move(state, depth):
+    best_move = None
+    max_eval = float("-inf")
+    legal_moves = state.get_legal_moves()
 
-            if best_move is not None:
-                state.make_move(best_move)
-            else:
-                # If no move maintains a higher piece count, select a random move
-                move = random.choice(possible_moves)
-                state.make_move(move)
-"""
+    for move in legal_moves:
+        child_state = state.clone()
+        child_state.make_move(move)
+        eval = alphabeta(child_state, depth - 1, float("-inf"), float("inf"), False)
+        if eval > max_eval:
+            max_eval = eval
+            best_move = move
+
+    return best_move
