@@ -291,7 +291,7 @@ class MCTS:
         for _ in range(self.simulation_count):
             node = self.selection(root)
 
-            score = self.simulation(node.state)
+            score = self.simulation(copy.deepcopy(node.state))
             self.backpropagate(node, score)
 
         best_child = root.children[0]
@@ -319,6 +319,7 @@ class MCTS:
         for move in possible_moves:
             new_state = copy.deepcopy(node.state)
             new_state.make_move(move)
+            # new_state.printBoard()
             node.add_child(new_state)
         # random_child = random.choice(node.children)
         # return random_child

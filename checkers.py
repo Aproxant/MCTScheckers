@@ -44,7 +44,7 @@ from MTCS import State, MCTS
 pygame.font.init()
 
 ##COLORS##
-#             R    G    B
+#R, G, B
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
