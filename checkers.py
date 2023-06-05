@@ -150,7 +150,7 @@ class Game:
 
         # MTCS
         # self.state=State(self.board.matrix)
-        self.MTCS = MCTS(simulation_count=50)
+        self.MTCS = MCTS(simulation_count=200)
 
     def setup(self):
         """Draws the window and board at the beginning of the game"""
@@ -572,20 +572,25 @@ class Board:
         y = pixel[1]
         blind_legal_moves = self.blind_legal_moves((x, y))
         legal_moves = []
-
+        hit=False
         if hop == False:
             for move in blind_legal_moves:
                 if hop == False:
                     if self.on_board(move):
-                        if self.location(move).occupant == None:
+                        if self.location(move).occupant == None and not hit:
                             legal_moves.append(move)
 
                         elif (
+                            self.location(move).occupant!=None and
                             self.location(move).occupant.color != self.location((x, y)).occupant.color
                             and self.on_board((move[0] + (move[0] - x), move[1] + (move[1] - y)))
                             and self.location((move[0] + (move[0] - x), move[1] + (move[1] - y))).occupant == None
                         ):  # is this location filled by an enemy piece?
-                            return [(move[0] + (move[0] - x), move[1] + (move[1] - y))]
+                            if not hit:
+                                hit=True
+                                legal_moves=[(move[0] + (move[0] - x), move[1] + (move[1] - y))]
+                            legal_moves.append((move[0] + (move[0] - x), move[1] + (move[1] - y)))
+                            #return [(move[0] + (move[0] - x), move[1] + (move[1] - y))]
                             #legal_moves.append((move[0] + (move[0] - x), move[1] + (move[1] - y)))
 							
         else:  # hop == True

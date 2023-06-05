@@ -40,11 +40,13 @@ class Node:
         for child in self.children:
             if child.visits == 0:
                 return child
+            """
             if child.state.current_player == 1:
-                score = -1 * child.score
+                score =  -1*child.score
             else:
                 score = child.score
-            exploit_score = score / child.visits
+            """
+            exploit_score = child.score / child.visits
             explore_score = math.sqrt(2 * math.log(self.visits) / child.visits)
             score = exploit_score + exploration_constant * explore_score
             if score > max_score:
@@ -116,7 +118,6 @@ class State:
     def legal_moves(self, x, y):
         blind_legal_moves = self.blind_legal_moves(x, y)
         legal_moves = []
-
         next_hop = True
         for move in blind_legal_moves:
             if self.on_board(move):
@@ -184,6 +185,22 @@ class State:
                     print(self.board[j][i].val, end=" ")
             print()
 
+    def getWinner(self):
+        red=0
+        blue=0
+        for i in range(len(self.board)):
+            for j in range(len(self.board)):
+                if self.board[j][i].val == -1:
+                    red+=1
+                elif self.board[j][i].val == 1:
+                    blue+=1
+                
+        
+        if red>blue:
+            return -1
+        else:
+            return 1
+
     def king(self, x, y):
         if self.board[x][y].val != 0:
             if (self.board[x][y].val == 1 and y == 0) or (self.board[x][y].val == -1 and y == 7):
@@ -240,7 +257,7 @@ class State:
             [0, 4, 0, 4, 0, 4, 0, 4],
         ]
 
-        evaluation += position_scores[end_row][end_col]
+        #evaluation += position_scores[end_row][end_col]
 
         # Evaluate distance-based factor
         nearest_opponent_distance = float("inf")
@@ -271,17 +288,17 @@ class State:
 
 
 class MCTS:
-    def __init__(self, exploration_constant=1.4, simulation_count=1000):
+    def __init__(self, exploration_constant=0.4, simulation_count=1000):
         self.exploration_constant = exploration_constant
         self.simulation_count = simulation_count
 
     def search(self, state):
         root = Node(state)
-
+        pla=root.state.current_player
         for i in range(self.simulation_count):
             node = self.selection(root)
 
-            score = self.simulation(copy.deepcopy(node.state))
+            score = self.simulation(copy.deepcopy(node.state),pla)
             self.backpropagate(node, score)
             #print(i)
 
@@ -316,7 +333,7 @@ class MCTS:
         # random_child = random.choice(node.children)
         # return random_child
 
-    def simulation(self, state):
+    def simulation(self, state,plat):
         while not state.check_for_endgame():
             possible_moves = state.get_possible_moves()
             prioritized_moves = []
@@ -328,10 +345,11 @@ class MCTS:
 
             state.make_move(move)
 
-        if state.current_player == -1:
+
+        if plat == state.getWinner():
             return 1
         else:
-            return -1
+            return 0
 
     def backpropagate(self, node, score):
         while node is not None:
