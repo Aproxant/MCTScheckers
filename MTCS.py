@@ -319,6 +319,7 @@ class State:
         piece_count = [0, 0]  # Index 0 for player 1, index 1 for player 2
         king_count = [0, 0]
         position_score = [0, 0]
+        advancement_score = [0, 0] 
 
         for x in range(8):
             for y in range(8):
@@ -328,6 +329,8 @@ class State:
                     piece_count[player_index] += 1
                     if piece.king:
                         king_count[player_index] += 1
+                    else:
+                        advancement_score[player_index] += x if player_index == 0 else 7 - x
                     position_score[player_index] += position_scores[x][y]
 
         # Compute scores for each player
@@ -340,10 +343,10 @@ class State:
             king_count_score = king_count[i] * 1.5  # Scale if necessary
 
             # Adjust positional score
-            fposition_score = position_score[i]  # Scale if necessary
+            fposition_score = position_score[i]  * 2# Scale if necessary
 
             # Add all score components to the player's score
-            player_scores[i] = piece_count_score + king_count_score + fposition_score
+            player_scores[i] = piece_count_score + king_count_score + fposition_score + advancement_score[i]
 
         # Subtract the opponent's score from the current player's score
         evaluation = (

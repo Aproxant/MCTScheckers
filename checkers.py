@@ -181,7 +181,7 @@ class Game:
 
         if mode == "AI vs AI":
             state = State(self)
-            best_move = find_best_move(state, 6)
+            best_move = find_best_move(state, 5)
             # print(best_move)
             if best_move != 0:
                 self.updateAfterMCTS(best_move)
@@ -195,7 +195,7 @@ class Game:
 
             if self.turn == RED:
                 state = State(self)
-                best_move = find_best_move(state, 6)
+                best_move = find_best_move(state, 5)
                 self.updateAfterMCTS(best_move)
                 if not self.end_turn():
                     return False
