@@ -71,12 +71,11 @@ class State:
                         self.board[i][j] = Piece(-1)
                     else:
                         self.board[i][j] = Piece(1)
-                    
+
                     if game.board.matrix[i][j].occupant.king:
-                        self.board[i][j].king=True
+                        self.board[i][j].king = True
                 else:
                     self.board[i][j] = Piece(0)
-
 
         if game.turn == RED:
             self.current_player = -1
@@ -94,11 +93,11 @@ class State:
                         moves.append(((i, j), x[0], x[1]))
         return moves
 
-    def blind_legal_moves(self, x, y,hit=0):
-        if self.board[x][y].val != 0 or hit==1 or hit==-1:
-            if (self.board[x][y].val == 1 or hit==1) and self.board[x][y].king == False:
+    def blind_legal_moves(self, x, y, hit=0):
+        if self.board[x][y].val != 0 or hit == 1 or hit == -1:
+            if (self.board[x][y].val == 1 or hit == 1) and self.board[x][y].king == False:
                 blind_legal_moves = [(x - 1, y - 1), (x + 1, y - 1)]
-            elif (self.board[x][y].val == -1 or hit==-1) and self.board[x][y].king == False:
+            elif (self.board[x][y].val == -1 or hit == -1) and self.board[x][y].king == False:
                 blind_legal_moves = [(x - 1, y + 1), (x + 1, y + 1)]
             else:
                 blind_legal_moves = [(x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1), (x + 1, y + 1)]
@@ -127,22 +126,41 @@ class State:
                     self.board[move[0]][move[1]].val != self.board[x][y].val
                     and self.on_board((move[0] + (move[0] - x), move[1] + (move[1] - y)))
                     and self.board[move[0] + (move[0] - x)][move[1] + (move[1] - y)].val == 0
-                    ):  # is this location filled by an enemy piece?
-
+                ):  # is this location filled by an enemy piece?
                     hit = (move[0], move[1])
                     legal_moves = [((move[0] + (move[0] - x), move[1] + (move[1] - y)), [hit])]
                     while next_hop:
-                        next_hop = False                                               
-                        for i in self.blind_legal_moves(legal_moves[-1][0][0], legal_moves[-1][0][1],self.board[x][y].val):
-                            if self.on_board(i):  
+                        next_hop = False
+                        for i in self.blind_legal_moves(
+                            legal_moves[-1][0][0], legal_moves[-1][0][1], self.board[x][y].val
+                        ):
+                            if self.on_board(i):
                                 if i[0] == legal_moves[-1][1][-1][0] and i[1] == legal_moves[-1][1][-1][1]:
                                     continue
-                                if (self.board[i[0]][i[1]].val != 0 and self.board[i[0]][i[1]].val != self.board[legal_moves[-1][0][0]][legal_moves[-1][0][1]].val and self.on_board((i[0] + (i[0] - legal_moves[-1][0][0]), i[1] + (i[1] - legal_moves[-1][0][1])))
-                                    and self.board[i[0] + (i[0] - legal_moves[-1][0][0])][i[1] + (i[1] - legal_moves[-1][0][1])].val == 0):
+                                if (
+                                    self.board[i[0]][i[1]].val != 0
+                                    and self.board[i[0]][i[1]].val
+                                    != self.board[legal_moves[-1][0][0]][legal_moves[-1][0][1]].val
+                                    and self.on_board(
+                                        (i[0] + (i[0] - legal_moves[-1][0][0]), i[1] + (i[1] - legal_moves[-1][0][1]))
+                                    )
+                                    and self.board[i[0] + (i[0] - legal_moves[-1][0][0])][
+                                        i[1] + (i[1] - legal_moves[-1][0][1])
+                                    ].val
+                                    == 0
+                                ):
                                     hit = (i[0], i[1])
-                                    prevHit=copy.deepcopy(legal_moves[-1][1])
+                                    prevHit = copy.deepcopy(legal_moves[-1][1])
                                     prevHit.append(i)
-                                    legal_moves.append(((i[0] + (i[0] - legal_moves[-1][0][0]),i[1] + (i[1] - legal_moves[-1][0][1])),prevHit))
+                                    legal_moves.append(
+                                        (
+                                            (
+                                                i[0] + (i[0] - legal_moves[-1][0][0]),
+                                                i[1] + (i[1] - legal_moves[-1][0][1]),
+                                            ),
+                                            prevHit,
+                                        )
+                                    )
                                     next_hop = True
 
                     legal_moves = [legal_moves[-1]]
@@ -186,17 +204,16 @@ class State:
             print()
 
     def getWinner(self):
-        red=0
-        blue=0
+        red = 0
+        blue = 0
         for i in range(len(self.board)):
             for j in range(len(self.board)):
                 if self.board[j][i].val == -1:
-                    red+=1
+                    red += 1
                 elif self.board[j][i].val == 1:
-                    blue+=1
-                
-        
-        if red>blue:
+                    blue += 1
+
+        if red > blue:
             return -1
         else:
             return 1
@@ -257,7 +274,7 @@ class State:
             [0, 4, 0, 4, 0, 4, 0, 4],
         ]
 
-        #evaluation += position_scores[end_row][end_col]
+        # evaluation += position_scores[end_row][end_col]
 
         # Evaluate distance-based factor
         nearest_opponent_distance = float("inf")
@@ -294,19 +311,18 @@ class MCTS:
 
     def search(self, state):
         root = Node(state)
-        pla=root.state.current_player
+        pla = root.state.current_player
         for i in range(self.simulation_count):
             node = self.selection(root)
 
-            score = self.simulation(copy.deepcopy(node.state),pla)
+            score = self.simulation(copy.deepcopy(node.state), pla)
             self.backpropagate(node, score)
-            #print(i)
+            # print(i)
 
-        if len(root.children)==0:
+        if len(root.children) == 0:
             return 0
         best_child = root.children[0]
         for child in root.children:
-
             if child.visits > best_child.visits:
                 best_child = child
 
@@ -333,7 +349,7 @@ class MCTS:
         # random_child = random.choice(node.children)
         # return random_child
 
-    def simulation(self, state,plat):
+    def simulation(self, state, plat):
         while not state.check_for_endgame():
             possible_moves = state.get_possible_moves()
             prioritized_moves = []
@@ -345,7 +361,6 @@ class MCTS:
 
             state.make_move(move)
 
-
         if plat == state.getWinner():
             return 1
         else:
@@ -355,6 +370,7 @@ class MCTS:
         while node is not None:
             node.update(score)
             node = node.parent
+
 
 def alphabeta(state, depth, alpha, beta, maximizing_player):
     if depth == 0 or state.is_terminal():
@@ -384,6 +400,7 @@ def alphabeta(state, depth, alpha, beta, maximizing_player):
             if beta <= alpha:
                 break  # Alpha cutoff
         return min_eval
+
 
 def find_best_move(state, depth):
     best_move = None

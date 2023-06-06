@@ -44,7 +44,7 @@ from MTCS import State, MCTS
 pygame.font.init()
 
 ##COLORS##
-#R, G, B
+# R, G, B
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
@@ -57,6 +57,7 @@ NORTHWEST = "northwest"
 NORTHEAST = "northeast"
 SOUTHWEST = "southwest"
 SOUTHEAST = "southeast"
+
 
 class Button:
     def __init__(self, x, y, width, height, text, color):
@@ -74,10 +75,11 @@ class Button:
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
-                #print(f"Button '{self.text}' clicked!")
+                # print(f"Button '{self.text}' clicked!")
                 return self.text
             else:
                 return None
+
 
 class Menu:
     def __init__(self):
@@ -94,8 +96,8 @@ class Menu:
         self.screen = pygame.display.set_mode((self.window_size, self.window_size))
         self.button_rect = pygame.Rect(self.button_x, self.button_y, self.button_width, self.button_height)
 
-        self.button1 = Button(self.button_x, self.button_y-50, 200, 50, "AI vs AI", BLACK)
-        self.button2 = Button(self.button_x, self.button_y+50, 200, 50, "PL sv AI", BLACK)
+        self.button1 = Button(self.button_x, self.button_y - 50, 200, 50, "AI vs AI", BLACK)
+        self.button2 = Button(self.button_x, self.button_y + 50, 200, 50, "PL sv AI", BLACK)
 
     def setup_window(self):
         """
@@ -110,23 +112,21 @@ class Menu:
                 pygame.quit()
                 sys.exit()
 
-            ai=self.button1.handle_event(event)
-            if ai!=None:
+            ai = self.button1.handle_event(event)
+            if ai != None:
                 return ai
-            pl=self.button2.handle_event(event)
+            pl = self.button2.handle_event(event)
 
-            if pl!=None :
+            if pl != None:
                 return pl
-            
-            
-            
+
         self.screen.fill(WHITE)
 
         self.button1.draw(self.screen)
         self.button2.draw(self.screen)
-        #pygame.draw.rect(self.screen, BLACK, self.button_rect)
-        #button_label = self.font.render("Play", True, WHITE)
-        #self.screen.blit(button_label, (self.button_x + 10, self.button_y + 10))
+        # pygame.draw.rect(self.screen, BLACK, self.button_rect)
+        # button_label = self.font.render("Play", True, WHITE)
+        # self.screen.blit(button_label, (self.button_x + 10, self.button_y + 10))
         pygame.display.flip()
 
         return None
@@ -169,7 +169,7 @@ class Game:
                 if new_board.board[i][j].king:
                     self.board.matrix[i][j].occupant.king = True
 
-    def event_loop(self,mode):
+    def event_loop(self, mode):
         """
         The event loop. This is where events are triggered
         (like a mouse click) and then effect the game state.
@@ -178,22 +178,21 @@ class Game:
         if self.selected_piece != None:
             self.selected_legal_moves = self.board.legal_moves(self.selected_piece, self.hop)
 
-        if mode=="AI vs AI":
+        if mode == "AI vs AI":
             state = State(self)
             best_move = self.MTCS.search(state)
-            if best_move!=0:
+            if best_move != 0:
                 self.updateAfterMCTS(best_move)
             self.end_turn()
             if pygame.event.poll().type == QUIT:
                 self.terminate_game()
             return
-        
+
         for event in pygame.event.get():
             if event.type == QUIT:
                 self.terminate_game()
 
-
-            if self.turn==RED:
+            if self.turn == RED:
                 state = State(self)
                 best_move = self.MTCS.search(state)
                 self.updateAfterMCTS(best_move)
@@ -203,7 +202,8 @@ class Game:
                 if self.hop == False:
                     if (
                         self.board.location(self.mouse_pos).occupant != None
-                        and self.board.location(self.mouse_pos).occupant.color == self.turn  and self.board.checkIfHitPossible(self.mouse_pos,self.turn)
+                        and self.board.location(self.mouse_pos).occupant.color == self.turn
+                        and self.board.checkIfHitPossible(self.mouse_pos, self.turn)
                     ):
                         self.selected_piece = self.mouse_pos
 
@@ -257,8 +257,8 @@ class Game:
         self.menu.setup_window()
 
         while True:
-            mode=self.menu.eventLoop()
-            if mode!=None:
+            mode = self.menu.eventLoop()
+            if mode != None:
                 break
 
         self.setup()
@@ -281,14 +281,13 @@ class Game:
         self.selected_legal_moves = []
         self.hop = False
 
-        if self.check_for_endgame():            
+        if self.check_for_endgame():
             if self.turn == BLUE:
                 self.graphics.draw_message("RED WINS!")
             else:
                 self.graphics.draw_message("BLUE WINS!")
             return False
         return True
-
 
     def check_for_endgame(self):
         """
@@ -572,7 +571,7 @@ class Board:
         y = pixel[1]
         blind_legal_moves = self.blind_legal_moves((x, y))
         legal_moves = []
-        hit=False
+        hit = False
         if hop == False:
             for move in blind_legal_moves:
                 if hop == False:
@@ -581,18 +580,18 @@ class Board:
                             legal_moves.append(move)
 
                         elif (
-                            self.location(move).occupant!=None and
-                            self.location(move).occupant.color != self.location((x, y)).occupant.color
+                            self.location(move).occupant != None
+                            and self.location(move).occupant.color != self.location((x, y)).occupant.color
                             and self.on_board((move[0] + (move[0] - x), move[1] + (move[1] - y)))
                             and self.location((move[0] + (move[0] - x), move[1] + (move[1] - y))).occupant == None
                         ):  # is this location filled by an enemy piece?
                             if not hit:
-                                hit=True
-                                legal_moves=[(move[0] + (move[0] - x), move[1] + (move[1] - y))]
+                                hit = True
+                                legal_moves = [(move[0] + (move[0] - x), move[1] + (move[1] - y))]
                             legal_moves.append((move[0] + (move[0] - x), move[1] + (move[1] - y)))
-                            #return [(move[0] + (move[0] - x), move[1] + (move[1] - y))]
-                            #legal_moves.append((move[0] + (move[0] - x), move[1] + (move[1] - y)))
-							
+                            # return [(move[0] + (move[0] - x), move[1] + (move[1] - y))]
+                            # legal_moves.append((move[0] + (move[0] - x), move[1] + (move[1] - y)))
+
         else:  # hop == True
             for move in blind_legal_moves:
                 if self.on_board(move) and self.location(move).occupant != None:
@@ -612,26 +611,25 @@ class Board:
         x = pixel[0]
         y = pixel[1]
         self.matrix[x][y].occupant = None
-        
-    def checkIfHitPossible(self,pixel,player):
-        x=pixel[0]
-        y=pixel[1]
-        hit=[]
+
+    def checkIfHitPossible(self, pixel, player):
+        x = pixel[0]
+        y = pixel[1]
+        hit = []
         for i in range(8):
             for j in range(8):
-                if self.matrix[i][j].occupant !=None and self.matrix[i][j].occupant.color==player:
+                if self.matrix[i][j].occupant != None and self.matrix[i][j].occupant.color == player:
                     for z in self.legal_moves((i, j)):
-                        if abs(z[0]-i)==2 and abs(z[1]-j)==2:
-                            hit.append((i,j))
-                            
-        if len(hit)==0:
+                        if abs(z[0] - i) == 2 and abs(z[1] - j) == 2:
+                            hit.append((i, j))
+
+        if len(hit) == 0:
             return True
         for i in hit:
-            if i[0]==x and i[1]==y:
+            if i[0] == x and i[1] == y:
                 return True
 
         return False
-
 
     def move_piece(self, pixel_start, pixel_end):
         """
