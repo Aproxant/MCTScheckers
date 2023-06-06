@@ -40,7 +40,7 @@ Everest Witman - May 2014 - Marlboro College - Programming Workshop
 import pygame, sys
 import time
 from pygame.locals import *
-from MTCS import State, MCTS
+from MTCS import State, MCTS, find_best_move
 
 pygame.font.init()
 
@@ -181,7 +181,8 @@ class Game:
 
         if mode == "AI vs AI":
             state = State(self)
-            best_move = self.MTCS.search(state)
+            best_move = find_best_move(state, 6)
+            # print(best_move)
             if best_move != 0:
                 self.updateAfterMCTS(best_move)
             if not self.end_turn():
@@ -194,7 +195,7 @@ class Game:
 
             if self.turn == RED:
                 state = State(self)
-                best_move = self.MTCS.search(state)
+                best_move = find_best_move(state, 6)
                 self.updateAfterMCTS(best_move)
                 if not self.end_turn():
                     return False

@@ -303,6 +303,55 @@ class State:
 
         return evaluation
 
+    def evaluate_state(self):
+        position_scores = [
+            [4, 0, 4, 0, 4, 0, 4, 0],
+            [0, 3, 0, 3, 0, 3, 0, 4],
+            [4, 0, 2, 0, 2, 0, 3, 0],
+            [0, 2, 0, 1, 0, 2, 0, 2],
+            [2, 0, 1, 0, 1, 0, 2, 0],
+            [0, 2, 0, 2, 0, 1, 0, 2],
+            [4, 0, 3, 0, 2, 0, 3, 0],
+            [0, 4, 0, 4, 0, 4, 0, 4],
+        ]
+        evaluation = 0
+
+        piece_count = [0, 0]  # Index 0 for player 1, index 1 for player 2
+        king_count = [0, 0]
+        position_score = [0, 0]
+
+        for x in range(8):
+            for y in range(8):
+                piece = self.board[x][y]
+                if piece.val != 0:  # If there is a piece on this square
+                    player_index = 0 if piece.val == 1 else 1
+                    piece_count[player_index] += 1
+                    if piece.king:
+                        king_count[player_index] += 1
+                    position_score[player_index] += position_scores[x][y]
+
+        # Compute scores for each player
+        player_scores = [0, 0]
+        for i in range(2):
+            # Adjust piece count score
+            piece_count_score = piece_count[i]  # Scale if necessary
+
+            # Adjust king count score
+            king_count_score = king_count[i] * 1.5  # Scale if necessary
+
+            # Adjust positional score
+            fposition_score = position_score[i]  # Scale if necessary
+
+            # Add all score components to the player's score
+            player_scores[i] = piece_count_score + king_count_score + fposition_score
+
+        # Subtract the opponent's score from the current player's score
+        evaluation = (
+            player_scores[0] - player_scores[1] if self.current_player == 1 else player_scores[1] - player_scores[0]
+        )
+
+        return evaluation
+
 
 class MCTS:
     def __init__(self, exploration_constant=0.4, simulation_count=1000):
@@ -374,13 +423,13 @@ class MCTS:
 
 def alphabeta(state, depth, alpha, beta, maximizing_player):
     if depth == 0 or state.is_terminal():
-        return state.evaluate()
+        return state.evaluate_state()
 
     if maximizing_player:
         max_eval = float("-inf")
-        legal_moves = state.get_legal_moves()
+        legal_moves = state.get_possible_moves()
         for move in legal_moves:
-            child_state = state.clone()
+            child_state = copy.deepcopy(state)
             child_state.make_move(move)
             eval = alphabeta(child_state, depth - 1, alpha, beta, False)
             max_eval = max(max_eval, eval)
@@ -390,9 +439,9 @@ def alphabeta(state, depth, alpha, beta, maximizing_player):
         return max_eval
     else:
         min_eval = float("inf")
-        legal_moves = state.get_legal_moves()
+        legal_moves = state.get_possible_moves()
         for move in legal_moves:
-            child_state = state.clone()
+            child_state = copy.deepcopy(state)
             child_state.make_move(move)
             eval = alphabeta(child_state, depth - 1, alpha, beta, True)
             min_eval = min(min_eval, eval)
@@ -405,14 +454,15 @@ def alphabeta(state, depth, alpha, beta, maximizing_player):
 def find_best_move(state, depth):
     best_move = None
     max_eval = float("-inf")
-    legal_moves = state.get_legal_moves()
+    legal_moves = state.get_possible_moves()
 
     for move in legal_moves:
-        child_state = state.clone()
+        child_state = copy.deepcopy(state)
         child_state.make_move(move)
         eval = alphabeta(child_state, depth - 1, float("-inf"), float("inf"), False)
         if eval > max_eval:
             max_eval = eval
+            print(max_eval)
             best_move = move
-
-    return best_move
+    state.make_move(best_move)
+    return state
