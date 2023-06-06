@@ -1,0 +1,9 @@
+name: mcts
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - black=23.3.0
+  - pip=23.1.2
+  - pygame=2.4.0
+  - python=3.10.11
