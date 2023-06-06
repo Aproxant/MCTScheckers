@@ -38,6 +38,7 @@ Everest Witman - May 2014 - Marlboro College - Programming Workshop
 """
 
 import pygame, sys
+import time
 from pygame.locals import *
 from MTCS import State, MCTS
 
@@ -183,10 +184,9 @@ class Game:
             best_move = self.MTCS.search(state)
             if best_move != 0:
                 self.updateAfterMCTS(best_move)
-            self.end_turn()
-            if pygame.event.poll().type == QUIT:
-                self.terminate_game()
-            return
+            if not self.end_turn():
+                return False
+            return True
 
         for event in pygame.event.get():
             if event.type == QUIT:
@@ -196,7 +196,8 @@ class Game:
                 state = State(self)
                 best_move = self.MTCS.search(state)
                 self.updateAfterMCTS(best_move)
-                self.end_turn()
+                if not self.end_turn():
+                    return False
 
             if event.type == MOUSEBUTTONDOWN:
                 if self.hop == False:
@@ -249,7 +250,7 @@ class Game:
     def terminate_game(self):
         """Quits the program and ends the game."""
         pygame.quit()
-        sys.exit
+        sys.exit()
 
     def main(self):
         """ "This executes the game and controls its flow."""
@@ -264,7 +265,10 @@ class Game:
         self.setup()
 
         while True:  # main game loop
-            self.event_loop(mode)
+            if self.event_loop(mode) == False:
+                self.update()
+                time.sleep(3)
+                self.terminate_game()
             self.update()
 
     def end_turn(self):
