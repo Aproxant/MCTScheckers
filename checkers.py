@@ -40,7 +40,8 @@ Everest Witman - May 2014 - Marlboro College - Programming Workshop
 import pygame, sys
 import time
 from pygame.locals import *
-from MTCS import State, MCTS, find_best_move
+from MTCS import State, MCTS
+import argparse
 
 pygame.font.init()
 
@@ -83,7 +84,7 @@ class Button:
 
 
 class Menu:
-    def __init__(self):
+    def __init__(self, skip_menu=False):
         self.caption = "Main Menu"
         self.window_size = 600
         self.font = pygame.font.Font(None, 50)
@@ -99,6 +100,7 @@ class Menu:
 
         self.button1 = Button(self.button_x, self.button_y - 50, 200, 50, "AI vs AI", BLACK)
         self.button2 = Button(self.button_x, self.button_y + 50, 200, 50, "PL sv AI", BLACK)
+        self.skip_menu = skip_menu
 
     def setup_window(self):
         """
@@ -108,6 +110,8 @@ class Menu:
         pygame.display.set_caption(self.caption)
 
     def eventLoop(self):
+        if self.skip_menu:
+            return "AI vs AI"
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -138,20 +142,21 @@ class Game:
     The main game control.
     """
 
-    def __init__(self):
+    def __init__(self, skip_menu=False):
         self.graphics = Graphics()
         self.board = Board()
-        self.menu = Menu()
+        self.menu = Menu(skip_menu)
         self.game_running = False
         self.current_screen = "menu"
         self.turn = BLUE
         self.selected_piece = None  # a board location.
         self.hop = False
         self.selected_legal_moves = []
+        self.moves_without_capture = 0
 
         # MTCS
         # self.state=State(self.board.matrix)
-        self.MTCS = MCTS(simulation_count=200)
+        self.MTCS = MCTS(simulation_count=100)
 
     def setup(self):
         """Draws the window and board at the beginning of the game"""
@@ -181,10 +186,15 @@ class Game:
 
         if mode == "AI vs AI":
             state = State(self)
-            best_move = find_best_move(state, 5)
-            # print(best_move)
-            if best_move != 0:
-                self.updateAfterMCTS(best_move)
+            # best_move = find_best_move(state, 5)
+            new_state, mv = self.MTCS.search(state)
+            # check if same number of pieces on board
+            if len(mv[2]) == 0:
+                self.moves_without_capture += 1
+            else:
+                self.moves_without_capture = 0
+            if new_state != 0:
+                self.updateAfterMCTS(new_state)
             if not self.end_turn():
                 return False
             return True
@@ -195,8 +205,9 @@ class Game:
 
             if self.turn == RED:
                 state = State(self)
-                best_move = find_best_move(state, 5)
-                self.updateAfterMCTS(best_move)
+                # best_move = find_best_move(state, 5)
+                new_state = self.MTCS.search(state)
+                self.updateAfterMCTS(new_state)
                 if not self.end_turn():
                     return False
 
@@ -268,7 +279,6 @@ class Game:
         while True:  # main game loop
             if self.event_loop(mode) == False:
                 self.update()
-                time.sleep(3)
                 self.terminate_game()
             self.update()
 
@@ -282,14 +292,21 @@ class Game:
         else:
             self.turn = BLUE
 
+        if self.moves_without_capture >= 70:
+            print("DRAW!")
+            self.graphics.draw_message("DRAW!")
+            return False
+
         self.selected_piece = None
         self.selected_legal_moves = []
         self.hop = False
 
         if self.check_for_endgame():
             if self.turn == BLUE:
+                print("RED WINS!")
                 self.graphics.draw_message("RED WINS!")
             else:
+                print("BLUE WINS!")
                 self.graphics.draw_message("BLUE WINS!")
             return False
         return True
@@ -726,7 +743,10 @@ class Square:
 
 
 def main():
-    game = Game()
+    parser = argparse.ArgumentParser(description="Play checkers")
+    parser.add_argument("--skip_menu", help="Skip the menu and start the AI VS AI game", action="store_true")
+    args = parser.parse_args()
+    game = Game(args.skip_menu)
     game.main()
 
 

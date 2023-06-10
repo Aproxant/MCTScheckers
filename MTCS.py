@@ -2,6 +2,8 @@ import random
 import copy
 import math
 
+from collections import defaultdict
+
 WHITE = (255, 255, 255)
 BLUE = (0, 0, 255)
 RED = (255, 0, 0)
@@ -16,15 +18,16 @@ SOUTHEAST = "southeast"
 
 
 class Node:
-    def __init__(self, state, parent=None):
+    def __init__(self, state, parent=None, action=((0, 0), (0, 0), [])):
         self.state = state
         self.parent = parent
+        self.action = action
         self.children = []
         self.visits = 0
         self.score = 0
 
-    def add_child(self, child_state):
-        child_node = Node(child_state, self)
+    def add_child(self, child_state, action):
+        child_node = Node(child_state, self, action)
         self.children.append(child_node)
 
     def update(self, score):
@@ -34,21 +37,42 @@ class Node:
     def fully_expanded(self):
         return len(self.children) == len(self.state.get_possible_moves())
 
-    def select_child(self, exploration_constant):
+    def select_child(self, exploration_constant, action_values, action_counts, player):
         max_score = float("-inf")
         selected_child = None
+
+        def UCT():
+            exploit_score = child.score / child.visits
+            explore_score = math.sqrt(2 * math.log(self.visits) / child.visits)
+            return exploit_score + exploration_constant * explore_score
+
+        def UCB1_bias():
+            str_action = str(child.action)
+            W = 2
+            bias_score = (action_values[str_action] / action_counts[str_action]) * W / (child.visits - child.score + 1)
+            return UCT() + bias_score
+
+        def UCB1_tuned():
+            exploit_score = child.score / child.visits
+            str_action = str(child.action)
+            mean = action_values[str_action] / action_counts[str_action]
+            variance = mean * (1 - mean)
+
+            explore_score_var = math.sqrt(
+                math.log(self.visits)
+                / child.visits
+                * min(1 / 4, variance + math.sqrt(2 * math.log(self.visits) / child.visits))
+            )
+            return exploit_score + exploration_constant * explore_score_var
+
         for child in self.children:
             if child.visits == 0:
                 return child
-            """
-            if child.state.current_player == 1:
-                score =  -1*child.score
+
+            if player == 1:  # try to make blue better
+                score = UCT()
             else:
-                score = child.score
-            """
-            exploit_score = child.score / child.visits
-            explore_score = math.sqrt(2 * math.log(self.visits) / child.visits)
-            score = exploit_score + exploration_constant * explore_score
+                score = UCT()
             if score > max_score:
                 max_score = score
                 selected_child = child
@@ -96,11 +120,11 @@ class State:
     def blind_legal_moves(self, x, y, hit=0):
         if self.board[x][y].val != 0 or hit == 1 or hit == -1:
             if (self.board[x][y].val == 1 or hit == 1) and self.board[x][y].king == False:
-                blind_legal_moves = [(x - 1, y - 1), (x + 1, y - 1)]
+                blind_legal_moves = [(x - 1, y - 1, 0), (x + 1, y - 1, 0)]
             elif (self.board[x][y].val == -1 or hit == -1) and self.board[x][y].king == False:
-                blind_legal_moves = [(x - 1, y + 1), (x + 1, y + 1)]
+                blind_legal_moves = [(x - 1, y + 1, 0), (x + 1, y + 1, 0)]
             else:
-                blind_legal_moves = [(x - 1, y - 1), (x + 1, y - 1), (x - 1, y + 1), (x + 1, y + 1)]
+                blind_legal_moves = [(x - 1, y - 1, 1), (x + 1, y - 1, 1), (x - 1, y + 1, 1), (x + 1, y + 1, 1)]
         else:
             blind_legal_moves = []
 
@@ -128,7 +152,7 @@ class State:
                     and self.board[move[0] + (move[0] - x)][move[1] + (move[1] - y)].val == 0
                 ):  # is this location filled by an enemy piece?
                     hit = (move[0], move[1])
-                    legal_moves = [((move[0] + (move[0] - x), move[1] + (move[1] - y)), [hit])]
+                    legal_moves = [((move[0] + (move[0] - x), move[1] + (move[1] - y), move[2]), [hit])]
                     while next_hop:
                         next_hop = False
                         for i in self.blind_legal_moves(
@@ -139,8 +163,7 @@ class State:
                                     continue
                                 if (
                                     self.board[i[0]][i[1]].val != 0
-                                    and self.board[i[0]][i[1]].val
-                                    != self.board[legal_moves[-1][0][0]][legal_moves[-1][0][1]].val
+                                    and self.board[i[0]][i[1]].val != self.board[x][y].val
                                     and self.on_board(
                                         (i[0] + (i[0] - legal_moves[-1][0][0]), i[1] + (i[1] - legal_moves[-1][0][1]))
                                     )
@@ -157,6 +180,7 @@ class State:
                                             (
                                                 i[0] + (i[0] - legal_moves[-1][0][0]),
                                                 i[1] + (i[1] - legal_moves[-1][0][1]),
+                                                i[2],
                                             ),
                                             prevHit,
                                         )
@@ -176,7 +200,7 @@ class State:
     def make_move(self, move):
         start, end = move[0], move[1]
         x, y = start
-        end_x, end_y = end
+        end_x, end_y, isKing = end
 
         if len(move[2]) == 0:
             self.board[end_x][end_y].val = self.board[x][y].val
@@ -239,7 +263,7 @@ class State:
     def evaluate_move(self, move):
         start, end = move[0], move[1]
 
-        end_row, end_col = end
+        end_row, end_col, isKing = end
 
         evaluation = 0
 
@@ -319,7 +343,7 @@ class State:
         piece_count = [0, 0]  # Index 0 for player 1, index 1 for player 2
         king_count = [0, 0]
         position_score = [0, 0]
-        advancement_score = [0, 0] 
+        advancement_score = [0, 0]
 
         for x in range(8):
             for y in range(8):
@@ -343,7 +367,7 @@ class State:
             king_count_score = king_count[i] * 1.5  # Scale if necessary
 
             # Adjust positional score
-            fposition_score = position_score[i]  * 2# Scale if necessary
+            fposition_score = position_score[i] * 2  # Scale if necessary
 
             # Add all score components to the player's score
             player_scores[i] = piece_count_score + king_count_score + fposition_score + advancement_score[i]
@@ -360,13 +384,17 @@ class MCTS:
     def __init__(self, exploration_constant=0.4, simulation_count=1000):
         self.exploration_constant = exploration_constant
         self.simulation_count = simulation_count
+        self.state_history = {}
+        self.action_values = defaultdict(int)
+        self.action_counts = defaultdict(int)
+        self.action_variance = defaultdict(float)
+        self.action_values_var = defaultdict(float)
 
     def search(self, state):
         root = Node(state)
         pla = root.state.current_player
         for i in range(self.simulation_count):
-            node = self.selection(root)
-
+            node = self.selection(root, pla)
             score = self.simulation(copy.deepcopy(node.state), pla)
             self.backpropagate(node, score)
             # print(i)
@@ -378,15 +406,15 @@ class MCTS:
             if child.visits > best_child.visits:
                 best_child = child
 
-        return best_child.state
+        return best_child.state, best_child.action
 
-    def selection(self, node):
+    def selection(self, node, pla):
         while not node.state.check_for_endgame():
             if not node.fully_expanded():
                 self.expand(node)
-                return node.select_child(self.exploration_constant)
+                return node.select_child(self.exploration_constant, self.action_values, self.action_counts, pla)
             else:
-                node = node.select_child(self.exploration_constant)
+                node = node.select_child(self.exploration_constant, self.action_values, self.action_counts, pla)
             # node.state.printBoard()
             # print()
         return node
@@ -397,11 +425,12 @@ class MCTS:
             new_state = copy.deepcopy(node.state)
             new_state.make_move(move)
             # new_state.printBoard()
-            node.add_child(new_state)
+            node.add_child(new_state, move)
         # random_child = random.choice(node.children)
         # return random_child
 
-    def simulation(self, state, plat):
+    def simulation(self, state, pla):
+        actions_taken = []
         while not state.check_for_endgame():
             possible_moves = state.get_possible_moves()
             prioritized_moves = []
@@ -410,10 +439,10 @@ class MCTS:
                 prioritized_moves.append(state.evaluate_move(move))
 
             move = random.choices(possible_moves, weights=prioritized_moves, k=1)[0]
-
+            actions_taken.append(move)
             state.make_move(move)
 
-        if plat == state.getWinner():
+        if pla == state.getWinner():
             return 1
         else:
             return 0
@@ -421,6 +450,10 @@ class MCTS:
     def backpropagate(self, node, score):
         while node is not None:
             node.update(score)
+            if node.action is not None:
+                str_action = str(node.action)
+                self.action_values[str_action] += score
+                self.action_counts[str_action] += 1
             node = node.parent
 
 
