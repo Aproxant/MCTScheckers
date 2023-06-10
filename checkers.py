@@ -38,10 +38,10 @@ Everest Witman - May 2014 - Marlboro College - Programming Workshop
 """
 
 import pygame, sys
-import time
 from pygame.locals import *
-from MTCS import State, MCTS
+from MTCS import State, MCTS, AlphaBeta, AI
 import argparse
+import yaml
 
 pygame.font.init()
 
@@ -142,7 +142,7 @@ class Game:
     The main game control.
     """
 
-    def __init__(self, skip_menu=False):
+    def __init__(self, config, skip_menu=False):
         self.graphics = Graphics()
         self.board = Board()
         self.menu = Menu(skip_menu)
@@ -156,7 +156,17 @@ class Game:
 
         # MTCS
         # self.state=State(self.board.matrix)
-        self.MTCS = MCTS(simulation_count=100)
+
+        mp = {
+            "alphabeta": AlphaBeta(6),
+            "mcts-uct": MCTS(simulation_count=100, selection_policy="uct"),
+            "mcts-uct-bias": MCTS(simulation_count=100, selection_policy="uct-bias"),
+            "mcts-ucb1-tuned": MCTS(simulation_count=100, selection_policy="ucb1-tuned"),
+        }
+
+        player1 = mp[config["ai1"]]
+        player2 = mp[config["ai2"]]
+        self.ai = AI(player1, player2)
 
     def setup(self):
         """Draws the window and board at the beginning of the game"""
@@ -187,7 +197,7 @@ class Game:
         if mode == "AI vs AI":
             state = State(self)
             # best_move = find_best_move(state, 5)
-            new_state, mv = self.MTCS.search(state)
+            new_state, mv = self.ai.get_move(state)
             # check if same number of pieces on board
             if len(mv[2]) == 0:
                 self.moves_without_capture += 1
@@ -746,7 +756,11 @@ def main():
     parser = argparse.ArgumentParser(description="Play checkers")
     parser.add_argument("--skip_menu", help="Skip the menu and start the AI VS AI game", action="store_true")
     args = parser.parse_args()
-    game = Game(args.skip_menu)
+
+    with open("config.yml", "r") as file:
+        config = yaml.safe_load(file)
+
+    game = Game(config, args.skip_menu)
     game.main()
 
 

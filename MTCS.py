@@ -37,7 +37,7 @@ class Node:
     def fully_expanded(self):
         return len(self.children) == len(self.state.get_possible_moves())
 
-    def select_child(self, exploration_constant, action_values, action_counts, player):
+    def select_child(self, exploration_constant, action_values, action_counts, selection_policy):
         max_score = float("-inf")
         selected_child = None
 
@@ -46,7 +46,7 @@ class Node:
             explore_score = math.sqrt(2 * math.log(self.visits) / child.visits)
             return exploit_score + exploration_constant * explore_score
 
-        def UCB1_bias():
+        def UCT_bias():
             str_action = str(child.action)
             W = 2
             bias_score = (action_values[str_action] / action_counts[str_action]) * W / (child.visits - child.score + 1)
@@ -68,11 +68,12 @@ class Node:
         for child in self.children:
             if child.visits == 0:
                 return child
-
-            if player == 1:  # try to make blue better
+            if selection_policy == "uct":
                 score = UCT()
-            else:
-                score = UCT()
+            elif selection_policy == "uct-bias":
+                score = UCT_bias()
+            elif selection_policy == "ucb1-tuned":
+                score = UCB1_tuned()
             if score > max_score:
                 max_score = score
                 selected_child = child
@@ -381,7 +382,7 @@ class State:
 
 
 class MCTS:
-    def __init__(self, exploration_constant=0.4, simulation_count=1000):
+    def __init__(self, exploration_constant=0.4, simulation_count=1000, selection_policy="uct"):
         self.exploration_constant = exploration_constant
         self.simulation_count = simulation_count
         self.state_history = {}
@@ -389,6 +390,7 @@ class MCTS:
         self.action_counts = defaultdict(int)
         self.action_variance = defaultdict(float)
         self.action_values_var = defaultdict(float)
+        self.selection_policy = selection_policy
 
     def search(self, state):
         root = Node(state)
@@ -412,9 +414,13 @@ class MCTS:
         while not node.state.check_for_endgame():
             if not node.fully_expanded():
                 self.expand(node)
-                return node.select_child(self.exploration_constant, self.action_values, self.action_counts, pla)
+                return node.select_child(
+                    self.exploration_constant, self.action_values, self.action_counts, self.selection_policy
+                )
             else:
-                node = node.select_child(self.exploration_constant, self.action_values, self.action_counts, pla)
+                node = node.select_child(
+                    self.exploration_constant, self.action_values, self.action_counts, self.selection_policy
+                )
             # node.state.printBoard()
             # print()
         return node
@@ -457,48 +463,63 @@ class MCTS:
             node = node.parent
 
 
-def alphabeta(state, depth, alpha, beta, maximizing_player):
-    if depth == 0 or state.is_terminal():
-        return state.evaluate_state()
+class AlphaBeta:
+    def __init__(self, depth=3):
+        self.depth = depth
 
-    if maximizing_player:
+    def alphabeta(self, state, depth, alpha, beta, maximizing_player):
+        if depth == 0 or state.is_terminal():
+            return state.evaluate_state()
+
+        if maximizing_player:
+            max_eval = float("-inf")
+            legal_moves = state.get_possible_moves()
+            for move in legal_moves:
+                child_state = copy.deepcopy(state)
+                child_state.make_move(move)
+                eval = self.alphabeta(child_state, depth - 1, alpha, beta, False)
+                max_eval = max(max_eval, eval)
+                alpha = max(alpha, eval)
+                if beta <= alpha:
+                    break  # Beta cutoff
+            return max_eval
+        else:
+            min_eval = float("inf")
+            legal_moves = state.get_possible_moves()
+            for move in legal_moves:
+                child_state = copy.deepcopy(state)
+                child_state.make_move(move)
+                eval = self.alphabeta(child_state, depth - 1, alpha, beta, True)
+                min_eval = min(min_eval, eval)
+                beta = min(beta, eval)
+                if beta <= alpha:
+                    break  # Alpha cutoff
+            return min_eval
+
+    def search(self, state):
+        best_move = None
         max_eval = float("-inf")
         legal_moves = state.get_possible_moves()
+
         for move in legal_moves:
             child_state = copy.deepcopy(state)
             child_state.make_move(move)
-            eval = alphabeta(child_state, depth - 1, alpha, beta, False)
-            max_eval = max(max_eval, eval)
-            alpha = max(alpha, eval)
-            if beta <= alpha:
-                break  # Beta cutoff
-        return max_eval
-    else:
-        min_eval = float("inf")
-        legal_moves = state.get_possible_moves()
-        for move in legal_moves:
-            child_state = copy.deepcopy(state)
-            child_state.make_move(move)
-            eval = alphabeta(child_state, depth - 1, alpha, beta, True)
-            min_eval = min(min_eval, eval)
-            beta = min(beta, eval)
-            if beta <= alpha:
-                break  # Alpha cutoff
-        return min_eval
+            eval = self.alphabeta(child_state, self.depth - 1, float("-inf"), float("inf"), False)
+            if eval > max_eval:
+                max_eval = eval
+                # print(max_eval)
+                best_move = move
+        state.make_move(best_move)
+        return state, best_move
 
 
-def find_best_move(state, depth):
-    best_move = None
-    max_eval = float("-inf")
-    legal_moves = state.get_possible_moves()
+class AI:
+    def __init__(self, player1_algo, player2_algo):
+        self.player1 = player1_algo
+        self.player2 = player2_algo
 
-    for move in legal_moves:
-        child_state = copy.deepcopy(state)
-        child_state.make_move(move)
-        eval = alphabeta(child_state, depth - 1, float("-inf"), float("inf"), False)
-        if eval > max_eval:
-            max_eval = eval
-            print(max_eval)
-            best_move = move
-    state.make_move(best_move)
-    return state
+    def get_move(self, state):
+        if state.current_player == 1:
+            return self.player1.search(state)
+        else:
+            return self.player2.search(state)
