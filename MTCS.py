@@ -16,6 +16,10 @@ NORTHEAST = "northeast"
 SOUTHWEST = "southwest"
 SOUTHEAST = "southeast"
 
+BLUE_DIRS = [(-1, -1), (1, -1)]
+RED_DIRS = [(-1, 1), (1, 1)]
+KING_DIRS = BLUE_DIRS + RED_DIRS
+
 
 class Node:
     def __init__(self, state, parent=None, action=((0, 0), (0, 0), [])):
@@ -48,9 +52,10 @@ class Node:
 
         def UCT_bias():
             str_action = str(child.action)
-            W = 2
+            W = 0.5
             bias_score = (action_values[str_action] / action_counts[str_action]) * W / (child.visits - child.score + 1)
-            return UCT() + bias_score
+            uct = UCT()
+            return uct + bias_score
 
         def UCB1_tuned():
             exploit_score = child.score / child.visits
@@ -219,13 +224,13 @@ class State:
 
         self.current_player = -self.current_player
 
-    def printBoard(self):
-        for i in range(len(self.board)):
-            for j in range(len(self.board)):
-                if self.board[j][i].val == -1:
+    def printBoard(self, board):
+        for i in range(len(board)):
+            for j in range(len(board)):
+                if board[j][i].val == -1:
                     print(2, end=" ")
                 else:
-                    print(self.board[j][i].val, end=" ")
+                    print(board[j][i].val, end=" ")
             print()
 
     def getWinner(self):
@@ -328,8 +333,115 @@ class State:
 
         return evaluation
 
+    # def evaluate_state(self):
+    #     position_scores = [
+    #         [4, 0, 4, 0, 4, 0, 4, 0],
+    #         [0, 3, 0, 3, 0, 3, 0, 4],
+    #         [4, 0, 2, 0, 2, 0, 3, 0],
+    #         [0, 2, 0, 1, 0, 2, 0, 2],
+    #         [2, 0, 1, 0, 1, 0, 2, 0],
+    #         [0, 2, 0, 2, 0, 1, 0, 2],
+    #         [4, 0, 3, 0, 2, 0, 3, 0],
+    #         [0, 4, 0, 4, 0, 4, 0, 4],
+    #     ]
+    #     evaluation = 0
+
+    #     piece_count = [0, 0]  # Index 0 for player 1, index 1 for player 2
+    #     king_count = [0, 0]
+    #     position_score = [0, 0]
+    #     advancement_score = [0, 0]
+
+    #     for x in range(8):
+    #         for y in range(8):
+    #             piece = self.board[x][y]
+    #             if piece.val != 0:  # If there is a piece on this square
+    #                 player_index = 0 if piece.val == 1 else 1
+    #                 piece_count[player_index] += 1
+    #                 if piece.king:
+    #                     king_count[player_index] += 1
+    #                 else:
+    #                     advancement_score[player_index] += x if player_index == 0 else 7 - x
+    #                 position_score[player_index] += position_scores[x][y]
+
+    #     # Compute scores for each player
+    #     player_scores = [0, 0]
+    #     for i in range(2):
+    #         # Adjust piece count score
+    #         piece_count_score = piece_count[i]  # Scale if necessary
+
+    #         # Adjust king count score
+    #         king_count_score = king_count[i] * 1.5  # Scale if necessary
+
+    #         # Adjust positional score
+    #         fposition_score = position_score[i] * 2  # Scale if necessary
+
+    #         # Add all score components to the player's score
+    #         player_scores[i] = piece_count_score + king_count_score + fposition_score + advancement_score[i]
+
+    #     # Subtract the opponent's score from the current player's score
+    #     evaluation = (
+    #         player_scores[0] - player_scores[1] if self.current_player == 1 else player_scores[1] - player_scores[0]
+    #     )
+
+    #     return evaluation
+
+    def can_capture(self, pla, i, j, op_i, op_j):
+        dx = op_i - i
+        dy = op_j - j
+
+        if pla == 1 and not self.board[i][j].king and (dx, dy) not in BLUE_DIRS:
+            return False
+        if pla == -1 and not self.board[i][j].king and (dx, dy) not in RED_DIRS:
+            return False
+
+        if self.on_board((op_i + dx, op_j + dy)) and self.board[op_i + dx][op_j + dy].val == 0:
+            return True
+        return False
+
+    def can_capture_next(self, pla, i, j, board):
+        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        opponent = -pla
+
+        for dx, dy in directions:
+            nx, ny = i + dx, j + dy
+            if self.on_board((nx, ny)) and board[nx][ny].val == opponent:
+                return self.can_capture(pla, i, j, nx, ny)
+        return False
+    
+    def is_vulnerable(self, pla, i, j, board):
+        directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+        opponent = -pla
+
+        for dx, dy in directions:
+            nx, ny = i + dx, j + dy
+
+            if self.on_board((nx, ny)) and board[nx][ny].val == opponent:
+
+                if self.can_capture(opponent, nx, ny, i, j):
+                    return True
+        return False
+
+
     def evaluate_state(self):
-        position_scores = [
+
+        # Compute the score using the custom heuristic
+        heuristic_score = self.calculate_heuristics(self.board, self.current_player)
+
+        return heuristic_score
+
+    def calculate_heuristics(self, board, player):
+        blue = [
+            [40, 0, 40, 0, 40, 0, 40, 0],
+            [0, 3, 0, 3, 0, 3, 0, 4],
+            [4, 0, 2, 0, 2, 0, 3, 0],
+            [0, 2, 0, 1, 0, 2, 0, 2],
+            [2, 0, 1, 0, 1, 0, 2, 0],
+            [0, 2, 0, 2, 0, 1, 0, 2],
+            [4, 0, 3, 0, 2, 0, 3, 0],
+            [0, 2, 0, 2, 0, 2, 0, 4],
+        ]
+
+        red = [
             [4, 0, 4, 0, 4, 0, 4, 0],
             [0, 3, 0, 3, 0, 3, 0, 4],
             [4, 0, 2, 0, 2, 0, 3, 0],
@@ -337,48 +449,37 @@ class State:
             [2, 0, 1, 0, 1, 0, 2, 0],
             [0, 2, 0, 2, 0, 1, 0, 2],
             [4, 0, 3, 0, 2, 0, 3, 0],
-            [0, 4, 0, 4, 0, 4, 0, 4],
+            [0, 40, 0, 40, 0, 40, 0, 40],
         ]
-        evaluation = 0
 
-        piece_count = [0, 0]  # Index 0 for player 1, index 1 for player 2
-        king_count = [0, 0]
-        position_score = [0, 0]
-        advancement_score = [0, 0]
+        result = 0
+        scores = [0, 0, 0]
+        piece_counts = [0, 0, 0]
+        king_edge_penalty = 15
+        safety_penalty = 20
+        capture_bonus = 20
 
-        for x in range(8):
-            for y in range(8):
-                piece = self.board[x][y]
-                if piece.val != 0:  # If there is a piece on this square
-                    player_index = 0 if piece.val == 1 else 1
-                    piece_count[player_index] += 1
-                    if piece.king:
-                        king_count[player_index] += 1
-                    else:
-                        advancement_score[player_index] += x if player_index == 0 else 7 - x
-                    position_score[player_index] += position_scores[x][y]
+        for i in range(8):
+            for j in range(8):
+                piece = board[i][j]  # If there is a piece on this square
+                if piece.val == 0:
+                    continue
+                piece_counts[piece.val] += 1
+                scores[piece.val] += blue[j][i] if piece.val == 1 else red[j][i]
+                if piece.king:
+                    scores[piece.val] += 10
+                    if j == 0 or j == 7:
+                        scores[piece.val] -= king_edge_penalty
+                if self.is_vulnerable(piece.val, i, j, board):
+                    scores[piece.val] -= safety_penalty  
 
-        # Compute scores for each player
-        player_scores = [0, 0]
-        for i in range(2):
-            # Adjust piece count score
-            piece_count_score = piece_count[i]  # Scale if necessary
+                if self.can_capture_next(piece.val, i, j, board):
+                    scores[piece.val] += capture_bonus  
 
-            # Adjust king count score
-            king_count_score = king_count[i] * 1.5  # Scale if necessary
+        piece_difference_bonus = (piece_counts[player] - piece_counts[-player]) * 100
+        result = scores[player] + piece_difference_bonus - scores[-player]
+        return result
 
-            # Adjust positional score
-            fposition_score = position_score[i] * 2  # Scale if necessary
-
-            # Add all score components to the player's score
-            player_scores[i] = piece_count_score + king_count_score + fposition_score + advancement_score[i]
-
-        # Subtract the opponent's score from the current player's score
-        evaluation = (
-            player_scores[0] - player_scores[1] if self.current_player == 1 else player_scores[1] - player_scores[0]
-        )
-
-        return evaluation
 
 
 class MCTS:
@@ -477,9 +578,9 @@ class AlphaBeta:
             for move in legal_moves:
                 child_state = copy.deepcopy(state)
                 child_state.make_move(move)
-                eval = self.alphabeta(child_state, depth - 1, alpha, beta, False)
-                max_eval = max(max_eval, eval)
-                alpha = max(alpha, eval)
+                ev = self.alphabeta(child_state, depth - 1, alpha, beta, False)
+                max_eval = max(max_eval, ev)
+                alpha = max(alpha, ev)
                 if beta <= alpha:
                     break  # Beta cutoff
             return max_eval
@@ -489,9 +590,9 @@ class AlphaBeta:
             for move in legal_moves:
                 child_state = copy.deepcopy(state)
                 child_state.make_move(move)
-                eval = self.alphabeta(child_state, depth - 1, alpha, beta, True)
-                min_eval = min(min_eval, eval)
-                beta = min(beta, eval)
+                ev = self.alphabeta(child_state, depth - 1, alpha, beta, True)
+                min_eval = min(min_eval, ev)
+                beta = min(beta, ev)
                 if beta <= alpha:
                     break  # Alpha cutoff
             return min_eval
@@ -504,10 +605,10 @@ class AlphaBeta:
         for move in legal_moves:
             child_state = copy.deepcopy(state)
             child_state.make_move(move)
-            eval = self.alphabeta(child_state, self.depth - 1, float("-inf"), float("inf"), False)
-            if eval > max_eval:
-                max_eval = eval
-                # print(max_eval)
+            ev = self.alphabeta(child_state, self.depth - 1, float("-inf"), float("inf"), False)
+            if ev > max_eval:
+                max_eval = ev
+                # print(max_eval, "MAXEVAL")
                 best_move = move
         state.make_move(best_move)
         return state, best_move

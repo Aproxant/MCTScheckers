@@ -42,6 +42,7 @@ from pygame.locals import *
 from MTCS import State, MCTS, AlphaBeta, AI
 import argparse
 import yaml
+import time
 
 pygame.font.init()
 
@@ -216,7 +217,7 @@ class Game:
             if self.turn == RED:
                 state = State(self)
                 # best_move = find_best_move(state, 5)
-                new_state = self.MTCS.search(state)
+                new_state, mv = self.ai.get_move(state)
                 self.updateAfterMCTS(new_state)
                 if not self.end_turn():
                     return False
@@ -289,6 +290,7 @@ class Game:
         while True:  # main game loop
             if self.event_loop(mode) == False:
                 self.update()
+                time.sleep(5)
                 self.terminate_game()
             self.update()
 
